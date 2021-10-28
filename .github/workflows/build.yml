@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  schedule:
+    # Every day at 9AM EST
+    - cron:  '0 13 * * *'
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build
+        run: |
+           docker build --tag deephaven-examples/app-mode-init-python .
+           docker-compose -f docker-compose.yml -p  test-tables up -d
+#        uses: ./.github/actions/build
+#        with:
+#          project-file: ./docker-compose.yml
+#          docker-build-command: docker build --tag deephaven-examples/app-mode-init-python .
+#          project-name: test-tables
+      - name: Validate tables
+        uses: ./.github/actions/validate-tables
+        with:
+          table-names: "source,result"
+          host: "envoy"
+          project-name: test-tables
