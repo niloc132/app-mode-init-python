@@ -12,8 +12,6 @@ from deephaven.appmode import ApplicationState, get_app_state
 
 from typing import Callable
 
-ApplicationState = jpy.get_type("io.deephaven.appmode.ApplicationState")
-
 #Non ApplicationState examples. These global variables are available for use within Deephaven
 def hello():
     print("Hello world")
