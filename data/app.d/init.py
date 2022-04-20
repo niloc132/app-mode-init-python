@@ -1,34 +1,75 @@
-"""
-init.py
+# Deephaven imports
+from deephaven import DynamicTableWriter
+from deephaven import dtypes as dht
+from deephaven.learn import gather
+from deephaven.csv import read
+from deephaven import learn
 
-A very simple example of initializing a Deephaven server through application mode.
+# Machine learning imports
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
 
-This script simply makes a table with 5 values in it.
+# Python imports
+import numpy as np, random, threading, time
 
-@copyright Deephaven Data Labs LLC
-"""
-from deephaven import empty_table
-from deephaven.appmode import ApplicationState, get_app_state
+iris_raw = read("https://media.githubusercontent.com/media/deephaven/examples/main/Iris/csv/iris.csv")
 
-from typing import Callable
+classes = {}
+num_classes = 0
+def get_class_number(c):
+    global classes, num_classes
+    if c not in classes:
+        classes[c] = num_classes
+        num_classes += 1
+    return classes[c]
 
-#Non ApplicationState examples. These global variables are available for use within Deephaven
-def hello():
-    print("Hello world")
+iris = iris_raw.update(formulas = ["Class = (int)(byte)get_class_number(Class)"])
 
-source = empty_table(5)
-result = source.update(["Values = i"])
+# Our neural network
+model = Sequential()
+model.add(Dense(16, activation = tf.nn.relu))
+model.add(Dense(12, activation = tf.nn.relu))
+model.add(Dense(3, activation = tf.nn.softmax))
 
-#ApplicationState examples. These variables are scoped to the application mode function, and
-#only become global variables during the app[<variable>] assignment.
-def start(app: ApplicationState):
-    table = empty_table(5)
-    table = table.update(["Values = i"])
+# A function that trains the model
+def train_model(X_train, Y_train):
+    model.compile(optimizer = tf.keras.optimizers.Adam(learning_rate = 0.01), loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits = True), metrics = ["accuracy"])
+    model.fit(x = X_train, y = Y_train, epochs = 100)
 
-    app["table"] = table
+# A function that gets the model's predictions on input data
+def predict_with_model(features):
+    if features.ndim == 1:
+        features = np.expand_dims(features, 0)
+    predictions = model.predict(features)
+    return np.array([np.argmax(item) for item in predictions], dtype = np.intc)
 
-def initialize(func: Callable[[ApplicationState], None]):
-  app = get_app_state()
-  func(app)
+# A function to gather data from table columns into a NumPy array of doubles
+def table_to_array_double(rows, cols):
+    return gather.table_to_numpy_2d(rows, cols, np_type = np.double)
 
-initialize(start)
+# A function to gather data from table columns into a NumPy array of doubles
+def table_to_array_int(rows, cols):
+    return gather.table_to_numpy_2d(rows, cols, np_type = np.intc)
+
+# A function to extract a list element and cast to an integer
+def get_predicted_class(data, idx):
+    return int(data[idx])
+
+
+print('about to fail')
+# Use the learn function to train our neural network
+learn.learn(
+    table = iris,
+    model_func = train_model,
+    inputs = [learn.Input(["SepalLengthCM", "SepalWidthCM", "PetalLengthCM", "PetalWidthCM"], table_to_array_double), learn.Input(["Class"], table_to_array_int)],
+    outputs = None,
+    batch_size = 150
+)
+
+print('didn\'t crash!')
+print('numpy ' + np.__file__)
+print('tensorflow ' + tf.__file__)
+print('deephaven ' + deephaven.__file__)
+exit(0)
+

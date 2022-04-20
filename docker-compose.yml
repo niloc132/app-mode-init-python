@@ -2,7 +2,12 @@ version: "3.4"
 
 services:
   server:
-    image: ghcr.io/deephaven/server:${VERSION:-edge}
+#    image: ghcr.io/deephaven/server:${VERSION:-edge}
+    build:
+      context: .
+      args:
+        - DH_VERS=${DH_VERS}
+        - TF_VERS=${TF_VERS}
     expose:
       - '8080'
     volumes:
